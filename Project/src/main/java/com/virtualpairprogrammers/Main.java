@@ -1,20 +1,13 @@
 package com.virtualpairprogrammers;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
-
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-
-import scala.Tuple2;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 
 public class Main {
 
@@ -27,41 +20,29 @@ public class Main {
     loggerConfig.setLevel(Level.WARN);
     loggerContext.updateLoggers();
 
-    SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
-    JavaSparkContext sc = new JavaSparkContext(conf);
+    // SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+    // JavaSparkContext sc = new JavaSparkContext(conf);
 
-    JavaRDD<String> initialRdd = sc.textFile("src/main/resources/subtitles/input.txt");
+    SparkSession spark =
+        SparkSession.builder()
+            .appName("testingsql")
+            .master("local[*]")
+            .config("spark.sql.warehouse.dir", "file:///c:/tmp/")
+            .getOrCreate();
 
-    JavaRDD<String> lettersOnlyRdd =
-        initialRdd.map(sentence -> sentence.replaceAll("[^a-zA-Z\\s]", "").toLowerCase());
+    Dataset<Row> dataset =
+        spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
-    JavaRDD<String> removedBlankLines =
-        lettersOnlyRdd.filter(sentence -> sentence.trim().length() > 0);
+    dataset.show();
 
-    JavaRDD<String> justWords =
-        removedBlankLines.flatMap(sentence -> Arrays.asList(sentence.split(" ")).iterator());
+    Row firstRow = dataset.first();
 
-    JavaRDD<String> blankWordsRemoved = justWords.filter(word -> word.trim().length() > 0);
+    String subject = firstRow.getAs("score").toString();
+    System.out.println(subject);
 
-    JavaRDD<String> justInterestingWords = blankWordsRemoved.filter(word -> Util.isNotBoring(word));
+    long numberOfRows = dataset.count();
+    System.out.println("There are " + numberOfRows + " records.");
 
-    JavaPairRDD<String, Long> pairRdd =
-        justInterestingWords.mapToPair(word -> new Tuple2<String, Long>(word, 1L));
-
-    JavaPairRDD<String, Long> totals = pairRdd.reduceByKey((value1, value2) -> value1 + value2);
-
-    JavaPairRDD<Long, String> switched =
-        totals.mapToPair(tuple -> new Tuple2<Long, String>(tuple._2, tuple._1));
-
-    JavaPairRDD<Long, String> sorted = switched.sortByKey(false);
-
-    List<Tuple2<Long, String>> results = sorted.take(10);
-
-    results.forEach(result -> System.out.println(result));
-
-    Scanner scanner = new Scanner(System.in);
-    scanner.nextLine();
-
-    sc.close();
+    spark.close();
   }
 }
