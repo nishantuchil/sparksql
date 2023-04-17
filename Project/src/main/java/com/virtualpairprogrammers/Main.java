@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.spark.api.java.function.FilterFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -32,8 +33,14 @@ public class Main {
 
     Dataset<Row> dataset =
         spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+    // Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
 
-    Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
+    Dataset<Row> modernArtResults =
+        dataset.filter(
+            (FilterFunction<Row>)
+                row ->
+                    row.getAs("subject").equals("Modern Art")
+                        && Integer.parseInt(row.getAs("year")) >= 2007);
     modernArtResults.show();
 
     spark.close();
