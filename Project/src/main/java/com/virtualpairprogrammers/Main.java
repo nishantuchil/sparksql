@@ -33,15 +33,8 @@ public class Main {
     Dataset<Row> dataset =
         spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
-    dataset.show();
-
-    Row firstRow = dataset.first();
-
-    String subject = firstRow.getAs("score").toString();
-    System.out.println(subject);
-
-    long numberOfRows = dataset.count();
-    System.out.println("There are " + numberOfRows + " records.");
+    Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
+    modernArtResults.show();
 
     spark.close();
   }
