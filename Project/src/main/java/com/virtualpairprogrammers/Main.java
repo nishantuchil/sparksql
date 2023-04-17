@@ -1,7 +1,5 @@
 package com.virtualpairprogrammers;
 
-import static org.apache.spark.sql.functions.col;
-
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -34,12 +32,15 @@ public class Main {
 
     Dataset<Row> dataset =
         spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+
     // Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
+    // modernArtResults.show();
 
-    Dataset<Row> modernArtResults =
-        dataset.filter(col("subject").equalTo("Modern Art").and(col("year").geq(2007)));
+    dataset.createOrReplaceTempView("my_students_view");
 
-    modernArtResults.show();
+    Dataset<Row> results =
+        spark.sql("select max(score) from my_students_view where subject='French'");
+    results.show();
 
     spark.close();
   }
