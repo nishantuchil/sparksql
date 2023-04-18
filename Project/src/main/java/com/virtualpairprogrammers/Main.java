@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.spark.api.java.function.ForeachFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -56,6 +57,16 @@ public class Main {
     StructType schema = new StructType(fields);
     Dataset<Row> dataset = spark.createDataFrame(inMemory, schema);
     dataset.show();
+
+    dataset.createOrReplaceTempView("logging_view");
+    Dataset<Row> results =
+        spark.sql(
+            "select level, collect_list(datetime) from logging_view group by level order by level");
+    results.show();
+
+    results.foreach(
+        (ForeachFunction<Row>)
+            row -> System.out.println(row.getAs("collect_list(datetime)").toString()));
 
     /*
     Dataset<Row> dataset =
