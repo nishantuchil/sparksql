@@ -1,14 +1,12 @@
 package com.virtualpairprogrammers;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.spark.api.java.function.ForeachFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -32,6 +30,9 @@ public class Main {
     // SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
     // JavaSparkContext sc = new JavaSparkContext(conf);
 
+    ArrayList<Row> dataArray = new ArrayList<Row>();
+    dataArray.add(RowFactory.create(1L, "Hello World"));
+
     SparkSession spark =
         SparkSession.builder()
             .appName("testingsql")
@@ -39,34 +40,38 @@ public class Main {
             .config("spark.sql.warehouse.dir", "file:///c:/tmp/")
             .getOrCreate();
 
-    // Dataset<Row> modernArtResults = dataset.filter("subject = 'Modern Art' AND year >= 2007");
-    // modernArtResults.show();
-
-    List<Row> inMemory = new ArrayList<Row>();
-    inMemory.add(RowFactory.create("WARN", "2016-12-31 04:19:32"));
-    inMemory.add(RowFactory.create("FATAL", "2016-12-31 03:22:34"));
-    inMemory.add(RowFactory.create("WARN", "2016-12-31 03:21:21"));
-    inMemory.add(RowFactory.create("INFO", "2015-4-21 14:32:21"));
-    inMemory.add(RowFactory.create("FATAL", "2015-4-21 19:23:20"));
-
     StructField[] fields =
         new StructField[] {
-          new StructField("level", DataTypes.StringType, false, Metadata.empty()),
-          new StructField("datetime", DataTypes.StringType, false, Metadata.empty())
+          new StructField("id", DataTypes.LongType, false, Metadata.empty()),
+          new StructField("name", DataTypes.StringType, false, Metadata.empty())
         };
     StructType schema = new StructType(fields);
-    Dataset<Row> dataset = spark.createDataFrame(inMemory, schema);
-    dataset.show();
+
+    Dataset<Row> dataSet = spark.createDataFrame(dataArray, schema);
+    dataSet.show();
+
+    Dataset<Row> dataset =
+        spark.read().option("header", true).csv("src/main/resources/biglog_1.txt");
+    //    dataset.show();
 
     dataset.createOrReplaceTempView("logging_view");
+
     Dataset<Row> results =
         spark.sql(
-            "select level, collect_list(datetime) from logging_view group by level order by level");
+            "select level, date_format(datetime, 'MMMM') as month, date_format(datetime, 'M') as monthnum from logging_view order by monthnum");
     results.show();
 
-    results.foreach(
-        (ForeachFunction<Row>)
-            row -> System.out.println(row.getAs("collect_list(datetime)").toString()));
+    results.createOrReplaceTempView("logging_view");
+    results =
+        spark.sql(
+            "select level, month, count(1) as total from logging_view group by level, month order by cast(first(monthnum) as int), level");
+    // results = results.drop("monthnumber");
+    results.show(100);
+
+    results.createOrReplaceTempView("results_table");
+    results = spark.sql("select sum(total) from results_table");
+
+    results.show();
 
     /*
     Dataset<Row> dataset =
