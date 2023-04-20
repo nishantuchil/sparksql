@@ -1,6 +1,11 @@
 package com.virtualpairprogrammers;
 
+import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.date_format;
+
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -52,36 +57,53 @@ public class Main {
 
     Dataset<Row> dataset =
         spark.read().option("header", true).csv("src/main/resources/biglog_1.txt");
-    //    dataset.show();
-
-    dataset.createOrReplaceTempView("logging_view");
-
-    Dataset<Row> results =
-        spark.sql(
-            "select level, date_format(datetime, 'MMMM') as month, date_format(datetime, 'M') as monthnum from logging_view order by monthnum");
-    results.show();
-
-    results.createOrReplaceTempView("logging_view");
-    results =
-        spark.sql(
-            "select level, month, count(1) as total from logging_view group by level, month order by cast(first(monthnum) as int), level");
-    // results = results.drop("monthnumber");
-    results.show(100);
-
-    results.createOrReplaceTempView("results_table");
-    results = spark.sql("select sum(total) from results_table");
-
-    results.show();
 
     /*
-    Dataset<Row> dataset =
-        spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
+        dataset.createOrReplaceTempView("logging_view");
 
-    dataset.createOrReplaceTempView("my_students_view");
+        Dataset<Row> results =
+            spark.sql(
+                "select level, date_format(datetime, 'MMMM') as month, count(1) as total from logging_view group by level, month order by cast(first(date_format(datetime, 'M')) as int), level");
+        results.show();
 
-    Dataset<Row> results = spark.sql("select distinct(year) from my_students_view order by year");
-    results.show();
+        // results = results.drop("monthnumber");
+        results.show(100);
+
+        results.createOrReplaceTempView("results_table");
+        results = spark.sql("select sum(total) from results_table");
+
+        results.show();
     */
+
+    dataset =
+        dataset.select(
+            col("level"),
+            date_format(col("datetime"), "MMMM").alias("month"),
+            date_format(col("datetime"), "M").alias("monthnum").cast(DataTypes.IntegerType));
+
+    Object months[] =
+        new Object[] {
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+          "TestingMonth"
+        };
+    List<Object> monthsList = Arrays.asList(months);
+
+    dataset = dataset.groupBy(col("level")).pivot("month", monthsList).count().na().fill(0);
+    // dataset = dataset.groupBy(col("level"), col("month"), col("monthnum")).count();
+    // dataset = dataset.orderBy(col("monthnum"), col("level")).drop(col("monthnum"));
+
+    dataset.show(100);
     spark.close();
   }
 }
