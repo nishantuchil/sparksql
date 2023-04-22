@@ -1,9 +1,7 @@
 package com.virtualpairprogrammers;
 
-import static org.apache.spark.sql.functions.avg;
+import static org.apache.spark.sql.functions.callUDF;
 import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.round;
-import static org.apache.spark.sql.functions.stddev;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -13,6 +11,7 @@ import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
 
 public class ExamResults {
 
@@ -31,23 +30,25 @@ public class ExamResults {
             .config("spark.sql.warehouse.dir", "file:///c:/tmp")
             .getOrCreate();
 
+    spark
+        .udf()
+        .register(
+            "hasPassed",
+            (String grade, String subject) -> {
+              if (subject.equals("Biology")) {
+                if (grade.startsWith("A")) {
+                  return true;
+                }
+                return false;
+              }
+              return grade.startsWith("A") || grade.startsWith("B") || grade.startsWith("C");
+            },
+            DataTypes.BooleanType);
     Dataset<Row> dataset =
         spark.read().option("header", true).csv("src/main/resources/exams/students.csv");
 
-    /*
-    dataset =
-        dataset
-            .groupBy(col("subject"))
-            .agg(max(col("score")).alias("max score"), min(col("score")).alias("min score"));
-    */
+    dataset = dataset.withColumn("pass", callUDF("hasPassed", col("grade"), col("subject")));
 
-    dataset =
-        dataset
-            .groupBy(col("subject"))
-            .pivot(col("year"))
-            .agg(
-                round(avg(col("score")), 2).alias("average"),
-                round(stddev(col("score")), 2).alias("stddev"));
     dataset.show();
   }
 }
